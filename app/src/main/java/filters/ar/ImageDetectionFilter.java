@@ -1,7 +1,15 @@
 package filters.ar;
 
 import android.content.Context;
+import android.database.AbstractWindowedCursor;
+import android.database.Cursor;
+import android.database.CursorWindow;
+import android.os.Build.VERSION_CODES;
+import android.support.annotation.RequiresApi;
+import android.util.Log;
+import android.widget.Toast;
 
+import com.example.majid.ar.SqlTable;
 import com.example.majid.ar.adapters.CameraProjectionAdapter;
 
 import org.opencv.android.Utils;
@@ -19,6 +27,7 @@ import org.opencv.core.MatOfPoint2f;
 import org.opencv.core.MatOfPoint3f;
 import org.opencv.core.Point;
 import org.opencv.core.Point3;
+import org.opencv.core.Scalar;
 import org.opencv.features2d.DescriptorExtractor;
 import org.opencv.features2d.DescriptorMatcher;
 import org.opencv.features2d.FeatureDetector;
@@ -27,28 +36,37 @@ import org.opencv.imgproc.Imgproc;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public final class ImageDetectionFilter implements ARFilter {
-    
+
+    private static final String TAG = "HOPE" ;
     // The reference image (this detector's target).
-    private final Mat mReferenceImage;
+    private Mat mReferenceImage;
+    List<Mat> mReferencesImage = new ArrayList<Mat>();
+    List<Mat> dbReferencesImages = new ArrayList<Mat>();
     // Features of the reference image.
     private final MatOfKeyPoint mReferenceKeypoints =
             new MatOfKeyPoint();
+    List<MatOfKeyPoint> mReferencesKeypoints = new ArrayList<MatOfKeyPoint>();
+
     // Descriptors of the reference image's features.
     private final Mat mReferenceDescriptors = new Mat();
+    List<Mat> mReferencesDescriptors = new ArrayList<Mat>();
     // The corner coordinates of the reference image, in pixels.
     // CVType defines the color depth, number of channels, and
     // channel layout in the image. Here, each point is represented
     // by two 32-bit floats.
     private final Mat mReferenceCorners =
             new Mat(4, 1, CvType.CV_32FC2);
+    List<Mat> mReferencesCorners = new ArrayList<Mat>();
     // The reference image's corner coordinates, in 3D, in real
     // units.
     private final MatOfPoint3f mReferenceCorners3D =
             new MatOfPoint3f();
-    
+    List<MatOfPoint3f> mReferencesCorners3D =  new ArrayList<MatOfPoint3f>();
+
     // Features of the scene (the current frame).
     private final MatOfKeyPoint mSceneKeypoints =
             new MatOfKeyPoint();
@@ -97,74 +115,72 @@ public final class ImageDetectionFilter implements ARFilter {
     private final MatOfDouble mRotation = new MatOfDouble();
     // The OpenGL pose matrix of the detected target.
     private final float[] mGLPose = new float[16];
-    
+    private  double realSize;
     // Whether the target is currently detected.
     private boolean mTargetFound = false;
     
+    @RequiresApi(api = VERSION_CODES.P)
     public ImageDetectionFilter(final Context context,
-            final int referenceImageResourceID,
-            final CameraProjectionAdapter cameraProjectionAdapter,
-            final double realSize)
+                                final int [] referenceImageResourceIDs,
+                                final CameraProjectionAdapter cameraProjectionAdapter,
+                                final double realSize)
                     throws IOException {
-        
+
+        this.realSize = realSize;
         // Load the reference image from the app's resources.
         // It is loaded in BGR (blue, green, red) format.
-        mReferenceImage = Utils.loadResource(context,
-                referenceImageResourceID,
-                Imgcodecs.CV_LOAD_IMAGE_COLOR);
-        
-        // Create grayscale and RGBA versions of the reference image.
-        final Mat referenceImageGray = new Mat();
-        Imgproc.cvtColor(mReferenceImage, referenceImageGray,
-                Imgproc.COLOR_BGR2GRAY);
-        Imgproc.cvtColor(mReferenceImage, mReferenceImage,
-                Imgproc.COLOR_BGR2RGBA);
-        
-        // Store the reference image's corner coordinates, in pixels.
-        mReferenceCorners.put(0, 0,
-                new double[] {0.0, 0.0});
-        mReferenceCorners.put(1, 0,
-                new double[] {referenceImageGray.cols(), 0.0});
-        mReferenceCorners.put(2, 0,
-                new double[] {referenceImageGray.cols(),
-                        referenceImageGray.rows()});
-        mReferenceCorners.put(3, 0,
-                new double[] {0.0, referenceImageGray.rows()});
-        
-        // Compute the image's width and height in real units, based
-        // on the specified real size of the image's smaller
-        // dimension.
-        final double aspectRatio =
-                (double)referenceImageGray.cols() /
-                (double)referenceImageGray.rows();
-        final double halfRealWidth;
-        final double halfRealHeight;
-        if (referenceImageGray.cols() > referenceImageGray.rows()) {
-            halfRealHeight = 0.5f * realSize;
-            halfRealWidth = halfRealHeight * aspectRatio;
-        } else {
-            halfRealWidth = 0.5f * realSize;
-            halfRealHeight = halfRealWidth / aspectRatio;
+
+
+        SqlTable sql = new SqlTable(context,"imgs",null,1);
+     /*   sql.deleteDb();
+        for (int i = 0; i< referenceImageResourceIDs.length; i++){
+
+            sql.dbput("hello"+i,Utils.loadResource(context,
+                    referenceImageResourceIDs[i],
+                    Imgcodecs.CV_LOAD_IMAGE_COLOR));
+            Log.i(TAG, "That Works" + i);
+        }*/
+
+
+
+        Cursor cursor = sql.dbget();
+        CursorWindow cw = new CursorWindow("test", 100 * 1024 * 1024);
+        AbstractWindowedCursor ac = (AbstractWindowedCursor) cursor;
+        ac.setWindow(cw);
+
+
+        Log.i(TAG, "Count..." + cursor.getCount());
+        if (cursor != null)
+            cursor.moveToFirst();
+
+        while (cursor.isAfterLast() == false){
+            int t = cursor.getInt(0);
+            int w = cursor.getInt(1);
+            int h = cursor.getInt(2);
+            byte[] p = cursor.getBlob(3);
+            Mat m = new Mat(h,w,t);
+            m.put(0,0,p);
+            dbReferencesImages.add(m);
+            Log.i(TAG, "Images Mat Blobs" + m.toString());
+            cursor.moveToNext();
         }
-        
-        // Define the real corner coordinates of the printed image
-        // so that it normally lies in the xy plane (like a painting
-        // or poster on a wall).
-        // That is, +z normally points out of the page toward the
-        // viewer.
-        mReferenceCorners3D.fromArray(
-                new Point3(-halfRealWidth, -halfRealHeight, 0.0),
-                new Point3( halfRealWidth, -halfRealHeight, 0.0),
-                new Point3( halfRealWidth,  halfRealHeight, 0.0),
-                new Point3(-halfRealWidth,  halfRealHeight, 0.0));
-        
-        // Detect the reference features and compute their
-        // descriptors.
-        mFeatureDetector.detect(referenceImageGray,
-                mReferenceKeypoints);
-        mDescriptorExtractor.compute(referenceImageGray,
-                mReferenceKeypoints, mReferenceDescriptors);
-        
+
+
+       // m = new Mat(200,400, CvType.CV_8UC3, new Scalar(0,100,0));
+        //Core.putText(m, "world (~)", new Point(30,80), Core.FONT_HERSHEY_SCRIPT_SIMPLEX, 2.2, new Scalar(200,200,200));
+       // sql.dbput("hello",m);
+       // m2 = sql.dbget("hello");
+
+        //Toast.makeText(getApplicationContext(), m2.toString(), Toast.LENGTH_LONG).show();
+
+/*
+        for (int i = 0; i< referenceImageResourceIDs.length; i++){
+             mReferencesImage.add( Utils.loadResource(context,
+                     referenceImageResourceIDs[i],
+                     Imgcodecs.CV_LOAD_IMAGE_COLOR) );
+        }
+
+*/
         mCameraProjectionAdapter = cameraProjectionAdapter;
     }
     
@@ -175,7 +191,7 @@ public final class ImageDetectionFilter implements ARFilter {
     
     @Override
     public void apply(final Mat src, final Mat dst) {
-        
+
         // Convert the scene to grayscale.
         Imgproc.cvtColor(src, mGraySrc, Imgproc.COLOR_RGBA2GRAY);
         
@@ -184,15 +200,105 @@ public final class ImageDetectionFilter implements ARFilter {
         mFeatureDetector.detect(mGraySrc, mSceneKeypoints);
         mDescriptorExtractor.compute(mGraySrc, mSceneKeypoints,
                 mSceneDescriptors);
-        mDescriptorMatcher.match(mSceneDescriptors,
-                mReferenceDescriptors, mMatches);
-        
-        // Attempt to find the target image's 3D pose in the scene.
-        findPose();
-        
+
+
+
+
+//////////////Check in local
+      for(int i =0; i< dbReferencesImages.size(); i++ ) {
+
+          mReferenceImage = dbReferencesImages.get(i);
+          // Create grayscale and RGBA versions of the reference image.
+          final Mat referenceImageGray = new Mat();
+          Imgproc.cvtColor(mReferenceImage, referenceImageGray,
+                  Imgproc.COLOR_BGR2GRAY);
+          Imgproc.cvtColor(mReferenceImage, mReferenceImage,
+                  Imgproc.COLOR_BGR2RGBA);
+
+
+          // Store the reference image's corner coordinates, in pixels.
+          mReferenceCorners.put(0, 0,
+                  new double[]{0.0, 0.0});
+          mReferenceCorners.put(1, 0,
+                  new double[]{referenceImageGray.cols(), 0.0});
+          mReferenceCorners.put(2, 0,
+                  new double[]{referenceImageGray.cols(),
+                          referenceImageGray.rows()});
+          mReferenceCorners.put(3, 0,
+                  new double[]{0.0, referenceImageGray.rows()});
+          Log.i(TAG, "mReferenceCorners  " + mReferenceCorners);
+
+
+          // Compute the image's width and height in real units, based
+          // on the specified real size of the image's smaller
+          // dimension.
+          final double aspectRatio =
+                  (double) referenceImageGray.cols() /
+                          (double) referenceImageGray.rows();
+          final double halfRealWidth;
+          final double halfRealHeight;
+          if (referenceImageGray.cols() > referenceImageGray.rows()) {
+              halfRealHeight = 0.5f * realSize;
+              halfRealWidth = halfRealHeight * aspectRatio;
+          } else {
+              halfRealWidth = 0.5f * realSize;
+              halfRealHeight = halfRealWidth / aspectRatio;
+          }
+
+
+          // Define the real corner coordinates of the printed image
+          // so that it normally lies in the xy plane (like a painting
+          // or poster on a wall).
+          // That is, +z normally points out of the page toward the
+          // viewer.
+          mReferenceCorners3D.fromArray(
+                  new Point3(-halfRealWidth, -halfRealHeight, 0.0),
+                  new Point3(halfRealWidth, -halfRealHeight, 0.0),
+                  new Point3(halfRealWidth, halfRealHeight, 0.0),
+                  new Point3(-halfRealWidth, halfRealHeight, 0.0));
+          Log.i(TAG, "mReferenceCorners3D  " + mReferenceCorners3D);
+
+          // Detect the reference features and compute their
+          // descriptors.
+          mFeatureDetector.detect(referenceImageGray,
+                  mReferenceKeypoints);
+          Log.i(TAG, "mReferenceKeypoints  " + mReferenceKeypoints);
+
+          mDescriptorExtractor.compute(referenceImageGray,
+                  mReferenceKeypoints, mReferenceDescriptors);
+          Log.i(TAG, "mReferenceDescriptors  " + mReferenceDescriptors);
+        //  mReferencesImage.add(mReferenceImage);
+        //  mReferencesCorners.add(mReferenceCorners);
+         // mReferencesCorners3D.add(mReferenceCorners3D);
+          //mReferencesKeypoints.add(mReferenceKeypoints);
+         // mReferencesDescriptors.add(mReferenceDescriptors);
+
+          Log.i(TAG, "mReferencesImage " + mReferencesImage);
+          Log.i(TAG, "mReferencesCorners " + mReferencesCorners);
+
+          Log.i(TAG, "mReferencesCorners3D " + mReferencesCorners3D);
+
+          Log.i(TAG, "mReferencesKeypoints " + mReferencesKeypoints);
+
+          Log.i(TAG, "mReferencesDescriptors " + mReferencesDescriptors);
+
+
+          mDescriptorMatcher.match(mSceneDescriptors,
+                  mReferenceDescriptors, mMatches);
+
+          // Attempt to find the target image's 3D pose in the scene.
+          findPose();
+          //draw(src, dst);
+
+          if(mTargetFound){
+              break;
+          }
+
+      }
+       // draw(src, dst);
+
         // If the pose has not been found, draw a thumbnail of the
         // target image.
-        draw(src, dst);
     }
     
     private void findPose() {
@@ -357,7 +463,7 @@ public final class ImageDetectionFilter implements ARFilter {
             src.copyTo(dst);
         }
         //Log.d("test" , mTargetFound + "");
-        if (!mTargetFound) {
+        if (mTargetFound) {
             // The target has not been found.
             
             // Draw a thumbnail of the target in the upper-left

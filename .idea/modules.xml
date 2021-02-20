@@ -2,9 +2,9 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/OpenCV-Augmented-Reality.iml" filepath="$PROJECT_DIR$/.idea/OpenCV-Augmented-Reality.iml" />
-      <module fileurl="file://$PROJECT_DIR$/.idea/modules/app/OpenCV-Augmented-Reality.app.iml" filepath="$PROJECT_DIR$/.idea/modules/app/OpenCV-Augmented-Reality.app.iml" />
-      <module fileurl="file://$PROJECT_DIR$/.idea/modules/openCVLibrary349/OpenCV-Augmented-Reality.openCVLibrary349.iml" filepath="$PROJECT_DIR$/.idea/modules/openCVLibrary349/OpenCV-Augmented-Reality.openCVLibrary349.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/TapisAr.iml" filepath="$PROJECT_DIR$/.idea/modules/TapisAr.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/app/TapisAr.app.iml" filepath="$PROJECT_DIR$/.idea/modules/app/TapisAr.app.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/openCVLibrary349/TapisAr.openCVLibrary349.iml" filepath="$PROJECT_DIR$/.idea/modules/openCVLibrary349/TapisAr.openCVLibrary349.iml" />
     </modules>
   </component>
 </project>
