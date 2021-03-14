@@ -99,12 +99,12 @@ public final class ImageDetectionFilter implements ARFilter {
     private final DescriptorMatcher mDescriptorMatcher =
             DescriptorMatcher.create(
                     DescriptorMatcher.BRUTEFORCE_HAMMINGLUT);
-    
+
     // Distortion coefficients of the camera's lens.
     // Assume no distortion.
     private final MatOfDouble mDistCoeffs = new MatOfDouble(
             0.0, 0.0, 0.0, 0.0);
-    
+
     // An adaptor that provides the camera's projection matrix.
     private final CameraProjectionAdapter mCameraProjectionAdapter;
     // The Euler angles of the detected target.
@@ -132,14 +132,14 @@ public final class ImageDetectionFilter implements ARFilter {
 
 
         SqlTable sql = new SqlTable(context,"imgs",null,1);
-     /*   sql.deleteDb();
+       sql.deleteDb();
         for (int i = 0; i< referenceImageResourceIDs.length; i++){
 
             sql.dbput("hello"+i,Utils.loadResource(context,
                     referenceImageResourceIDs[i],
                     Imgcodecs.CV_LOAD_IMAGE_COLOR));
             Log.i(TAG, "That Works" + i);
-        }*/
+        }
 
 
 
@@ -183,14 +183,18 @@ public final class ImageDetectionFilter implements ARFilter {
 */
         mCameraProjectionAdapter = cameraProjectionAdapter;
     }
-    
+
     @Override
     public float[] getGLPose() {
-        return (mTargetFound ? mGLPose : null);
+        return (mTargetFound ? null : null);
     }
-    
+
+
+
+
+
     @Override
-    public void apply(final Mat src, final Mat dst) {
+    public boolean apply(final Mat src, final Mat dst) {
 
         // Convert the scene to grayscale.
         Imgproc.cvtColor(src, mGraySrc, Imgproc.COLOR_RGBA2GRAY);
@@ -288,17 +292,12 @@ public final class ImageDetectionFilter implements ARFilter {
 
           // Attempt to find the target image's 3D pose in the scene.
           findPose();
-          //draw(src, dst);
-
           if(mTargetFound){
-              break;
+              return true;
           }
 
       }
-       // draw(src, dst);
-
-        // If the pose has not been found, draw a thumbnail of the
-        // target image.
+        return false;
     }
     
     private void findPose() {
@@ -355,7 +354,7 @@ public final class ImageDetectionFilter implements ARFilter {
                         sceneKeypointsList.get(match.queryIdx).pt);
             }
         }
-        
+
         if (goodReferencePointsList.size() < 4 ||
                 goodScenePointsList.size() < 4) {
             // There are too few good points to find the pose.
@@ -364,7 +363,7 @@ public final class ImageDetectionFilter implements ARFilter {
         
         // There are enough good points to find the pose.
         // (Otherwise, the method would have already returned.)
-        
+
         // Convert the matched points to MatOfPoint2f format, as
         // required by the Calib3d.findHomography function.
         final MatOfPoint2f goodReferencePoints = new MatOfPoint2f();

@@ -3,5 +3,5 @@ package filters;
 import org.opencv.core.Mat;
 
 public interface Filter {
-    public abstract void apply(final Mat src, final Mat dst);
+    public abstract boolean apply(final Mat src, final Mat dst);
 }

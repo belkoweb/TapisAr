@@ -1,7 +1,11 @@
 package com.example.majid.ar;
 
 import android.annotation.SuppressLint;
+import android.app.Dialog;
+import android.graphics.Color;
 import android.graphics.PixelFormat;
+import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.ColorDrawable;
 import android.hardware.Camera.Size;
 import android.opengl.GLSurfaceView;
 import android.os.AsyncTask;
@@ -11,6 +15,8 @@ import android.os.Environment;
 import android.support.annotation.RequiresApi;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
+import android.view.Gravity;
+import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.MotionEvent;
@@ -19,7 +25,11 @@ import android.view.SurfaceView;
 import android.view.View;
 import android.view.View.OnTouchListener;
 import android.view.WindowManager;
+import android.widget.Button;
 import android.widget.FrameLayout;
+import android.widget.LinearLayout;
+import android.widget.PopupWindow;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.example.majid.ar.adapters.CameraProjectionAdapter;
@@ -48,9 +58,10 @@ import filters.ar.NoneARFilter;
 
 public class MainActivity extends AppCompatActivity implements CvCameraViewListener2, OnTouchListener {
     private static final String TAG = "OCV::Activity";
+    private  boolean found;
    private ARFilter mFilter;
     private CameraView mOpenCvCameraView;
-
+    Dialog myDialog;
     private BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this)  {
         @RequiresApi(api = VERSION_CODES.P)
         @Override
@@ -107,6 +118,8 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
+
+        myDialog = new Dialog(this);
         Log.i(TAG, "called onCreate");
         super.onCreate(savedInstanceState);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
@@ -188,13 +201,37 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
 
             if (taskStatus == 0) {
                 new ImageInitAsyncTask().execute(rgba);
-
+                if(found){
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        ShowPopup(4)    ;                }
+                });}
             }
+
+
+
 
         return rgba;
 
 
     }
+    //android:screenOrientation="landscape"
+    public void ShowPopup(int v) {
+        TextView txtclose;
+        myDialog.setContentView(R.layout.popup_window);
+        txtclose = myDialog.findViewById(R.id.txtclose);
+        //txtclose.setText("M");
+        txtclose.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                myDialog.dismiss();
+            }
+        });
+        myDialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+        myDialog.show();
+    }
+
 
     final class ImageInitAsyncTask extends AsyncTask<Mat, String, String> {
 
@@ -212,7 +249,7 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
         @Override
         protected String doInBackground(Mat... mats) {
             mARRenderer.filter = mFilter;
-            mFilter.apply(
+           found =  mFilter.apply(
                     mats[0], mats[0]);
 
             return "Done ...";
